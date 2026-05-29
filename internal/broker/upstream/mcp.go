@@ -20,18 +20,20 @@ import (
 // initialization state from the MCP handshake.
 type MCPServer struct {
 	*config.MCPServer
-	client   *client.Client
-	clientMu sync.RWMutex
-	headers  map[string]string
-	init     *mcp.InitializeResult
+	client           *client.Client
+	clientMu         sync.RWMutex
+	headers          map[string]string
+	init             *mcp.InitializeResult
+	GatewayCACertPEM string
 }
 
 // NewUpstreamMCP creates a new MCPServer instance from the provided configuration.
 // It sets up default headers including user-agent and gateway-server-id, and adds
 // an Authorization header if credentials are configured.
-func NewUpstreamMCP(config *config.MCPServer) *MCPServer {
+func NewUpstreamMCP(config *config.MCPServer, gatewayCACertPEM string) *MCPServer {
 	up := &MCPServer{
-		MCPServer: config,
+		MCPServer:        config,
+		GatewayCACertPEM: gatewayCACertPEM,
 	}
 	up.headers = map[string]string{
 		"user-agent":        "mcp-broker",
@@ -43,10 +45,10 @@ func NewUpstreamMCP(config *config.MCPServer) *MCPServer {
 	return up
 }
 
-// buildHTTPClient creates a custom HTTP client with the configured CA certificate
-// appended to the system root pool. Returns nil if no CACert is configured.
+// buildHTTPClient creates a custom HTTP client with the configured CA certificates
+// appended to the system root pool. Returns nil if no CACerts are configured.
 func (up *MCPServer) buildHTTPClient() (*http.Client, error) {
-	if up.CACert == "" {
+	if up.CACert == "" && up.GatewayCACertPEM == "" {
 		return nil, nil //nolint:nilnil // nil client signals caller to use default transport
 	}
 
@@ -55,8 +57,16 @@ func (up *MCPServer) buildHTTPClient() (*http.Client, error) {
 		rootCAs = x509.NewCertPool()
 	}
 
-	if !rootCAs.AppendCertsFromPEM([]byte(up.CACert)) {
-		return nil, fmt.Errorf("failed to parse CA certificate PEM for upstream %s", up.Name)
+	if up.GatewayCACertPEM != "" {
+		if !rootCAs.AppendCertsFromPEM([]byte(up.GatewayCACertPEM)) {
+			return nil, fmt.Errorf("failed to parse gateway CA certificate bundle PEM for upstream %s", up.Name)
+		}
+	}
+
+	if up.CACert != "" {
+		if !rootCAs.AppendCertsFromPEM([]byte(up.CACert)) {
+			return nil, fmt.Errorf("failed to parse CA certificate PEM for upstream %s", up.Name)
+		}
 	}
 
 	transport := http.DefaultTransport.(*http.Transport).Clone()

@@ -28,7 +28,7 @@ func TestNewUpstreamMCP(t *testing.T) {
 		State:    string(mcpv1alpha1.ServerStateEnabled),
 		Hostname: "dummy",
 	}
-	up := NewUpstreamMCP(&testServer)
+	up := NewUpstreamMCP(&testServer, "")
 	require.NotNil(t, up)
 	require.Equal(t, testServer, up.GetConfig())
 }
@@ -66,7 +66,7 @@ func TestMCPServer_IsEnabled(t *testing.T) {
 				Name:  "test",
 				State: tc.state,
 			}
-			up := NewUpstreamMCP(&server)
+			up := NewUpstreamMCP(&server, "")
 			require.Equal(t, tc.expected, up.IsEnabled())
 		})
 	}
@@ -81,7 +81,7 @@ func TestNewUpstreamMCP_WithCACert(t *testing.T) {
 		Hostname: "dummy",
 		CACert:   "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
 	}
-	up := NewUpstreamMCP(&testServer)
+	up := NewUpstreamMCP(&testServer, "")
 	require.NotNil(t, up)
 	cfg := up.GetConfig()
 	require.Equal(t, testServer.CACert, cfg.CACert)
@@ -144,7 +144,8 @@ func TestBuildHTTPClient_NoCACert(t *testing.T) {
 	up := NewUpstreamMCP(&config.MCPServer{
 		Name: "no-ca",
 		URL:  "http://localhost:8080/mcp",
-	})
+	}, "")
+
 	client, err := up.buildHTTPClient()
 	require.NoError(t, err)
 	require.Nil(t, client, "should return nil when no CACert configured")
@@ -157,7 +158,8 @@ func TestBuildHTTPClient_WithValidCACert(t *testing.T) {
 		Name:   "with-ca",
 		URL:    "https://localhost:8443/mcp",
 		CACert: string(caPEM),
-	})
+	}, "")
+
 	client, err := up.buildHTTPClient()
 	require.NoError(t, err)
 	require.NotNil(t, client, "should return custom client when CACert configured")
@@ -168,7 +170,8 @@ func TestBuildHTTPClient_WithInvalidPEM(t *testing.T) {
 		Name:   "bad-ca",
 		URL:    "https://localhost:8443/mcp",
 		CACert: "not-valid-pem-data",
-	})
+	}, "")
+
 	_, err := up.buildHTTPClient()
 	require.Error(t, err, "should error on invalid PEM")
 	require.Contains(t, err.Error(), "failed to parse CA certificate")
@@ -189,7 +192,8 @@ func TestBuildHTTPClient_TLSConnection(t *testing.T) {
 		Name:   "tls-test",
 		URL:    srv.URL + "/mcp",
 		CACert: string(caPEM),
-	})
+	}, "")
+
 	httpClient, err := up.buildHTTPClient()
 	require.NoError(t, err)
 	require.NotNil(t, httpClient)
@@ -216,7 +220,8 @@ func TestBuildHTTPClient_TLSConnectionFailsWithoutCA(t *testing.T) {
 	up := NewUpstreamMCP(&config.MCPServer{
 		Name: "no-ca-test",
 		URL:  srv.URL + "/mcp",
-	})
+	}, "")
+
 	client, err := up.buildHTTPClient()
 	require.NoError(t, err)
 	require.Nil(t, client, "no CACert means nil client")
@@ -244,7 +249,8 @@ func TestBuildHTTPClient_WrongCACertFailsTLS(t *testing.T) {
 		Name:   "wrong-ca-test",
 		URL:    srv.URL + "/mcp",
 		CACert: string(wrongCaPEM),
-	})
+	}, "")
+
 	httpClient, err := up.buildHTTPClient()
 	require.NoError(t, err)
 	require.NotNil(t, httpClient)
@@ -273,7 +279,8 @@ func TestBuildHTTPClient_MultiCertBundle(t *testing.T) {
 		Name:   "bundle-test",
 		URL:    srv.URL + "/mcp",
 		CACert: string(bundle),
-	})
+	}, "")
+
 	httpClient, err := up.buildHTTPClient()
 	require.NoError(t, err)
 	require.NotNil(t, httpClient)
